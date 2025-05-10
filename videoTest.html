@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>video录制</title>
+    <style>
+        html,body {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        .layui-body {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        #container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+        }
+        .controls {
+            position: absolute;
+            bottom: 50px;
+            width: 100%;
+            display: flex;
+            justify-content:center ;
+            align-items: center;
+            flex-wrap: wrap;
+            
+        }
+        .button-wrap {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+        #record, #download {
+            padding: 10px 20px;
+            font-size: 20px;
+        
+        }
+        #tEl {
+            width: 100%;
+            text-align: center;
+            font-size: 20px;
+        }
+        #gum {
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="layui-body">
+        <div id="container">
+            <video id="gum" autoplay muted></video>
+            <div class="controls">
+                <div class="button-wrap">
+                    <button id="record" disabled>开始录制</button>
+                    <button id="download" disabled>下载</button>
+                </div>
+                <span id="tEl"></span>
+            </div>
+            
+        </div>
+    </div>
+</body>
+<script>
+    class RecordingVideo {
+        // 播放时长
+        duration = 0
+        // 录制流媒体
+        mediaRecorder
+        // 录制的数据
+        recordedBlobs
+        // 倒计时interlval
+        intervalId
+        // 切换背景色
+        intervalColor
+        // 摄像头流媒体
+        stream
+        // 录制时长
+        maxD = 15
+        // 倒计时初始值
+        count = 15
+        // 当前颜色
+        currentColor
+        // 颜色组
+        colorList = ['blue', 'yellow', 'red', 'white']
+        // 页面dom
+        gumVideo = document.querySelector('#gum')
+        recordButton = document.querySelector('#record')
+        downloadButton = document.querySelector('#download')
+        tEL = document.getElementById('tEl')
+        container = document.getElementById('container')
+        constructor() {
+            const constraints = {
+                audio: true,
+                video: {
+                    facingMode: "user",
+                    width: 400,//视频宽度
+                    height: 400,//视频高度
+                    frameRate: 60,//每秒60帧
+                }
+            }
+            // const isSecureOrigin = location.protocol === 'https:' || location.hostname === 'localhost'
+            // if (!isSecureOrigin) {
+            //     alert('getUserMedia() 必须在https或localhost下使用')
+            //     location.protocol = 'HTTPS'
+            // }
+            this.recordButton.onclick = () => this.toggleRecording()
+            this.downloadButton.onclick = () => this.download()
+            // 获取摄像头流媒体
+            this.getUserMedia(constraints,(stream) => {
+                // 摄像头流媒体成功回调
+                this.recordButton.disabled = false
+                this.stream = stream
+                this.gumVideo.srcObject = stream
+            },(e) => {
+                // 摄像头流媒体失败回调
+                if (error.message === 'Permission denied') {
+                    alert('您已经禁止使用摄像头，请到设置-通用-微信存储空间-管理微信存储空间-点击‘清理其他微信账号聊天数据’')
+                }
+                console.log('navigator.getUserMedia error: ', error)
+            })
+
+        }
+        // 获取摄像头流媒体
+        getUserMedia(constraints, success, error) {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                //最新的标准API
+                navigator.mediaDevices.getUserMedia(constraints).then(success).catch(error)
+            } else if (navigator.webkitGetUserMedia) {
+                //webkit核心浏览器
+                navigator.webkitGetUserMedia(constraints, success, error)
+            } else if (navigator.mozGetUserMedia) {
+                //firfox浏览器
+                navigator.mozGetUserMedia(constraints, success, error)
+            } else if (navigator.getUserMedia) {
+                //旧版API
+                navigator.getUserMedia(constraints, success, error)
+            }
+        }
+        // 开始录制的事件
+        toggleRecording() {
+            const tEl = this.tEL
+            if (this.recordButton.textContent === '开始录制') {
+                tEl.innerHTML = ''
+                this.startRecording()
+                clearInterval(this.intervalId)
+                clearInterval(this.intervalColor)
+                tEl.innerHTML = '剩余时间：'+this.count+'秒'
+                tEl.innerHTML = '剩余时间：'+this.count+'秒'
+                this.count--
+                this.intervalColor = setInterval(() => {
+                    let radomNum = Math.trunc(Math.random() * 4)
+                    this.container.style.backgroundColor = this.colorList[radomNum]
+                }, 500)
+                this.intervalId = setInterval(()  => {
+                    tEl.innerHTML = '剩余时间：'+this.count+'秒'
+                    if (this.count <= 0) {
+                        clearInterval(this.intervalId)
+                        clearInterval(this.intervalColor)
+                        this.container.style.backgroundColor = 'white'
+                        this.duration = this.maxD - this.count
+                        this.count = this.maxD
+                        this.stopRecording()
+                        this.recordButton.textContent = '开始录制'
+                        this.downloadButton.disabled = false
+                    } else {
+                        this.count--
+                    }
+
+                }, 1000)
+            } else {
+                clearInterval(this.intervalId)
+                clearInterval(this.intervalColor)
+
+                this.duration = this.maxD - this.count
+                this.count = this.maxD
+                this.stopRecording()
+                this.recordButton.textContent = '开始录制'
+                this.downloadButton.disabled = false
+                this.container.style.backgroundColor = 'white'
+            }
+        }
+        // 开始录制
+        startRecording() {
+            const isSafari = !(!(/Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)))
+
+            this.recordedBlobs = []
+            const options = {
+                audioBitsPerSecond: 128000,
+                videoBitsPerSecond: 2500000,
+                mimeType: isSafari ? 'video/mp4' : 'video/webm'
+            }
+            try {
+                this.mediaRecorder = new MediaRecorder(this.stream, options)
+            } catch (e) {
+                alert('MediaRecorder创建失败: ' + e + '. mimeType: ' + options.mimeType)
+                return
+            }
+            this.recordButton.textContent = '结束录制'
+            this.downloadButton.disabled = true
+
+            // 录制中
+            this.mediaRecorder.ondataavailable = event => {
+                if (event.data && event.data.size > 0) {
+                    this.recordedBlobs.push(event.data)
+                }
+            }
+            // 录制结束回调
+            this.mediaRecorder.onstop = event => {
+                console.log('Recorder stopped: ', event)
+            }
+            // 开始录制
+            this.mediaRecorder.start(10);
+        }
+        // 停止录制
+        stopRecording() {
+            tEl.innerHTML = '录制完成'
+            this.mediaRecorder.stop()
+        }
+        // 下载视频
+        download() {
+            const blob = new Blob(this.recordedBlobs, { type: 'video/mp4' })
+            const a = document.createElement('a')
+            a.setAttribute('download', Date.now() + '.mp4')
+            a.href = URL.createObjectURL(blob)
+            a.click()
+        }
+
+    }
+    new RecordingVideo()
+
+</script>
+
+</html>
